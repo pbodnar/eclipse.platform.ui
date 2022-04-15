@@ -29,7 +29,7 @@ import org.eclipse.ui.internal.misc.TextMatcher;
  */
 public class SearchPattern {
 
-	// Rules for pattern matching: (exact, prefix, pattern) [ | case sensitive]
+	// Rules for pattern matching:
 	/**
 	 * Match rule: The search pattern matches exactly the search result, that is,
 	 * the source of the search result equals the search pattern. Search pattern
@@ -39,6 +39,8 @@ public class SearchPattern {
 
 	/**
 	 * Match rule: The search pattern is a prefix of the search result.
+	 * <p>
+	 * This is the <em>default</em> match rule if no other applies.
 	 */
 	public static final int RULE_PREFIX_MATCH = 0x0001;
 
@@ -46,13 +48,21 @@ public class SearchPattern {
 	 * Match rule: The search pattern contains one or more wild cards ('*' or '?').
 	 * A '*' wild-card can replace 0 or more characters in the search result. A '?'
 	 * wild-card replaces exactly 1 character in the search result.
+	 * <p>
+	 * Unless the pattern ends with ' ' or '>', '*' is automatically added to the
+	 * end of the pattern.
+	 * <p>
+	 * When {@link #RULE_SUBSTRING_MATCH} is in effect, then '*' is automatically
+	 * added to the start of the pattern.
 	 */
 	public static final int RULE_PATTERN_MATCH = 0x0002;
 
 	/**
 	 * Match rule: The search pattern matches the search result only if cases are
 	 * the same. Can be combined with previous rules, e.g. {@link #RULE_EXACT_MATCH}
-	 * | {@link #RULE_CASE_SENSITIVE}
+	 * | {@link #RULE_CASE_SENSITIVE}.
+	 * <p>
+	 * TODO The actual code seems to ignore this flag when performing searches.
 	 */
 	public static final int RULE_CASE_SENSITIVE = 0x0008;
 
@@ -85,9 +95,32 @@ public class SearchPattern {
 	 * <code>"NPE"</code> string pattern, search will only use Camel Case match
 	 * rule, but with <code>N*P*E*</code> string pattern, it will use only Pattern
 	 * match rule.
-	 *
+	 * <p>
+	 * Unless {@link #RULE_SUBSTRING_MATCH} is in effect, it is required that
+	 * the 1st pattern's char must match the very 1st char of the search result.
 	 */
 	public static final int RULE_CAMELCASE_MATCH = 0x0080;
+
+	/**
+	 * Match rule: The search pattern is a string placed anywhere in the search
+	 * result. When in effect, this flag also affects some of the other match rules
+	 * (see their documentation for details).
+	 * <p>
+	 * Prefix search may still be enforced by placing '>' at the beginning of the
+	 * pattern. Analogically, suffix search may be enforced by placing ' ' or '&lt;'
+	 * at the end of the pattern.
+	 *
+	 * @since 3.126
+	 */
+	public static final int RULE_SUBSTRING_MATCH = 0x0200;
+
+	/**
+	 * The default set of match rules as used by the no-argument constructor.
+	 * 
+	 * @since 3.126
+	 */
+	public static final int DEFAULT_MATCH_RULES = RULE_EXACT_MATCH | RULE_PREFIX_MATCH | RULE_PATTERN_MATCH
+			| RULE_CAMELCASE_MATCH | RULE_BLANK_MATCH;
 
 	private int matchRule;
 
@@ -97,6 +130,8 @@ public class SearchPattern {
 
 	private TextMatcher stringMatcher;
 
+	private static final char START_SYMBOL = '>';
+
 	private static final char END_SYMBOL = '<';
 
 	private static final char ANY_STRING = '*';
@@ -105,15 +140,20 @@ public class SearchPattern {
 
 	private int allowedRules;
 
+	private boolean substringSearch;
+
+	private boolean matchPrefix;
+
+	private boolean matchSuffix;
+
 	/**
 	 * Creates a new instance of SearchPattern with the following match rules
 	 * configured: {@link #RULE_EXACT_MATCH} | {@link #RULE_PREFIX_MATCH} |
 	 * {@link #RULE_PATTERN_MATCH} | {@link #RULE_CAMELCASE_MATCH} |
-	 * {@link #RULE_BLANK_MATCH} )
-	 *
+	 * {@link #RULE_BLANK_MATCH}.
 	 */
 	public SearchPattern() {
-		this(RULE_EXACT_MATCH | RULE_PREFIX_MATCH | RULE_PATTERN_MATCH | RULE_CAMELCASE_MATCH | RULE_BLANK_MATCH);
+		this(DEFAULT_MATCH_RULES);
 	}
 
 	/**
@@ -138,6 +178,7 @@ public class SearchPattern {
 	 */
 	public SearchPattern(int allowedRules) {
 		this.allowedRules = allowedRules;
+		this.substringSearch = (allowedRules & RULE_SUBSTRING_MATCH) != 0;
 	}
 
 	/**
@@ -147,6 +188,16 @@ public class SearchPattern {
 	 */
 	public String getPattern() {
 		return this.stringPattern;
+	}
+
+	/**
+	 * Gets the initial (input) string pattern.
+	 *
+	 * @return pattern
+	 * @since 3.126
+	 */
+	public String getInitialPattern() {
+		return this.initialPattern;
 	}
 
 	/**
@@ -182,7 +233,19 @@ public class SearchPattern {
 			}
 			//$FALL-THROUGH$
 		default:
-			return startsWithIgnoreCase(text, stringPattern);
+			// apply RULE_PREFIX_MATCH / RULE_SUBSTRING_MATCH
+			boolean doMatchPrefix = matchPrefix || !substringSearch;
+			if (doMatchPrefix && !matchSuffix) {
+				return startsWithIgnoreCase(text, stringPattern);
+			}
+			if (!doMatchPrefix && matchSuffix) {
+				return endsWithIgnoreCase(text, stringPattern);
+			}
+			if (doMatchPrefix && matchSuffix) {
+				// the same as RULE_EXACT_MATCH
+				return stringPattern.equalsIgnoreCase(text);
+			}
+			return text.toLowerCase().contains(stringPattern.toLowerCase());
 		}
 	}
 
@@ -193,39 +256,43 @@ public class SearchPattern {
 			stringPattern = pattern;
 			return;
 		}
+
+		// pre-process the string pattern
+		char first = pattern.charAt(0);
 		char last = pattern.charAt(length - 1);
+		// note: a file name might start with a space => we can't use it for enforcing prefix match
+		matchPrefix = pattern.length() > 1 && first == START_SYMBOL;
+		matchSuffix = pattern.length() > (matchPrefix ? 2 : 1) && (last == END_SYMBOL || last == BLANK);
+		stringPattern = pattern;
+		if (matchPrefix) {
+			stringPattern = stringPattern.substring(1);
+		}
+		if (matchSuffix) {
+			stringPattern = stringPattern.substring(0, stringPattern.length() - 1);
+		}
 
 		if (pattern.indexOf('*') != -1 || pattern.indexOf('?') != -1) {
 			matchRule = RULE_PATTERN_MATCH;
-			switch (last) {
-			case END_SYMBOL:
-			case BLANK:
-				stringPattern = pattern.substring(0, length - 1);
-				break;
-			case ANY_STRING:
-				stringPattern = pattern;
-				break;
-			default:
-				stringPattern = pattern + ANY_STRING;
+			if (substringSearch && !matchPrefix && first != ANY_STRING) {
+				stringPattern = ANY_STRING + stringPattern;
+			}
+			if (!matchSuffix && last != ANY_STRING) {
+				stringPattern += ANY_STRING;
 			}
 			return;
 		}
 
-		if (validateMatchRule(pattern, RULE_CAMELCASE_MATCH) == RULE_CAMELCASE_MATCH) {
+		if (validateMatchRule(stringPattern, RULE_CAMELCASE_MATCH) == RULE_CAMELCASE_MATCH) {
 			matchRule = RULE_CAMELCASE_MATCH;
-			stringPattern = pattern;
 			return;
 		}
 
-		if (last == END_SYMBOL || last == BLANK) {
+		if ((!substringSearch || matchPrefix) && matchSuffix) {
 			matchRule = RULE_EXACT_MATCH;
-			stringPattern = pattern.substring(0, length - 1);
 			return;
 		}
 
 		matchRule = RULE_PREFIX_MATCH;
-		stringPattern = pattern;
-
 	}
 
 	/**
@@ -244,6 +311,20 @@ public class SearchPattern {
 				return false;
 		}
 		return true;
+	}
+
+	/**
+	 * @param text
+	 * @param suffix
+	 * @return true if text ends with given suffix, ignoring case; false in other
+	 *         way
+	 */
+	private boolean endsWithIgnoreCase(String text, String suffix) {
+		int textLength = text.length();
+		int suffixLength = suffix.length();
+		if (textLength < suffixLength)
+			return false;
+		return startsWithIgnoreCase(text.substring(textLength - suffixLength), suffix);
 	}
 
 	/**
@@ -427,32 +508,41 @@ public class SearchPattern {
 		// check first pattern char
 		if (name.charAt(nameStart) != pattern.charAt(patternStart)) {
 			// first char must strictly match (upper/lower)
-			return false;
+			if (!this.substringSearch || this.matchPrefix) {
+				return false;
+			}
+			nameStart = name.indexOf(pattern.charAt(patternStart), nameStart + 1);
+			if (nameStart < 0) {
+				return false;
+			}
 		}
-
-		int patternLength = patternEnd;
-
-		if (pattern.charAt(patternEnd - 1) == END_SYMBOL || pattern.charAt(patternEnd - 1) == BLANK)
-			patternLength = patternEnd - 1;
 
 		char patternChar, nameChar;
 		int iPattern = patternStart;
 		int iName = nameStart;
 
-		// Main loop is on pattern characters
+		// Main loop starts from the 2nd characters...
 		while (true) {
 
 			iPattern++;
 			iName++;
 
 			if (iPattern == patternEnd) {
-				// We have exhausted pattern, so it's a match
+				// We have exhausted pattern, so it might be a match
+				if (!this.matchSuffix) {
+					return true;
+				}
+				for (int i = iName; i < nameEnd; i++) {
+					if (isNameCharAllowed(name.charAt(i))) {
+						// There is another uppercase further in the name, but the pattern doesn't allow
+						// this
+						return false;
+					}
+				}
 				return true;
 			}
 
 			if (iName == nameEnd) {
-				if (iPattern == patternLength)
-					return true;
 				// We have exhausted name (and not pattern), so it's not a match
 				return false;
 			}
@@ -468,24 +558,15 @@ public class SearchPattern {
 			if (!isPatternCharAllowed(patternChar))
 				return false;
 
-			// patternChar is uppercase, so let's find the next uppercase in
+			// patternChar is uppercase, so let's find the next patternChar-matching uppercase in
 			// name
 			while (true) {
 				if (iName == nameEnd) {
-					if ((iPattern == patternLength) && (patternChar == END_SYMBOL || patternChar == BLANK))
-						return true;
+					// We have exhausted name (and not pattern), so it's not a match
 					return false;
 				}
 
 				nameChar = name.charAt(iName);
-
-				if ((iPattern == patternLength) && (patternChar == END_SYMBOL || patternChar == BLANK)) {
-					if (isNameCharAllowed(nameChar)) {
-						return false;
-					}
-					iName++;
-					continue;
-				}
 
 				if (Character.isDigit(nameChar)) {
 					// nameChar is digit => break if the digit is current pattern character
@@ -547,6 +628,22 @@ public class SearchPattern {
 	 */
 	public final int getMatchRule() {
 		return this.matchRule;
+	}
+
+	/**
+	 * @return whether prefix matching is enforced
+	 * @since 3.126
+	 */
+	public boolean isMatchPrefix() {
+		return matchPrefix;
+	}
+
+	/**
+	 * @return whether suffix matching is enforced
+	 * @since 3.126
+	 */
+	public boolean isMatchSuffix() {
+		return matchSuffix;
 	}
 
 	/**
@@ -658,14 +755,18 @@ public class SearchPattern {
 	 * @return true if the given pattern is a sub pattern of this search pattern
 	 */
 	public boolean isSubPattern(SearchPattern pattern) {
+		if (this.initialPattern.length() == 1 && this.initialPattern.charAt(0) == START_SYMBOL) {
+			return false;
+		}
 		return trimWildcardCharacters(pattern.initialPattern).startsWith(trimWildcardCharacters(this.initialPattern));
 	}
 
 	/**
-	 * Trims sequences of '*' characters
+	 * Replaces sequences of '*' characters by just one '*'. It doesn't do any
+	 * trimming actually.
 	 *
-	 * @param pattern string to be trimmed
-	 * @return trimmed pattern
+	 * @param pattern string to be normalize
+	 * @return normalized pattern
 	 */
 	private String trimWildcardCharacters(String pattern) {
 		return Util.replaceAll(pattern, "\\*+", "\\*"); //$NON-NLS-1$ //$NON-NLS-2$ }
