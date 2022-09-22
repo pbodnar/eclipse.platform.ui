@@ -61,9 +61,8 @@ public class SearchPattern {
 	 * Match rule: The search pattern matches the search result only if cases are
 	 * the same. Can be combined with previous rules, e.g. {@link #RULE_EXACT_MATCH}
 	 * | {@link #RULE_CASE_SENSITIVE}.
-	 * <p>
-	 * TODO The actual code seems to ignore this flag when performing searches.
 	 */
+	// TODO The actual code seems to ignore this flag when performing searches.
 	public static final int RULE_CASE_SENSITIVE = 0x0008;
 
 	/**
@@ -110,14 +109,14 @@ public class SearchPattern {
 	 * pattern. Analogically, suffix search may be enforced by placing ' ' or '&lt;'
 	 * at the end of the pattern.
 	 *
-	 * @since 3.126
+	 * @since 3.127
 	 */
 	public static final int RULE_SUBSTRING_MATCH = 0x0200;
 
 	/**
 	 * The default set of match rules as used by the no-argument constructor.
-	 * 
-	 * @since 3.126
+	 *
+	 * @since 3.127
 	 */
 	public static final int DEFAULT_MATCH_RULES = RULE_EXACT_MATCH | RULE_PREFIX_MATCH | RULE_PATTERN_MATCH
 			| RULE_CAMELCASE_MATCH | RULE_BLANK_MATCH;
@@ -157,24 +156,27 @@ public class SearchPattern {
 	}
 
 	/**
-	 * Creates a search pattern with the rule to apply for matching index keys. It
-	 * can be exact match, prefix match, pattern match or camelCase match. Rule can
-	 * also be combined with a case sensitivity flag.
+	 * Creates a search pattern with a rule or rules to apply for matching index keys.
 	 *
 	 * @param allowedRules one of {@link #RULE_EXACT_MATCH},
-	 *                     {@link #RULE_PREFIX_MATCH}, {@link #RULE_PATTERN_MATCH},
-	 *                     {@link #RULE_CASE_SENSITIVE},
-	 *                     {@link #RULE_CAMELCASE_MATCH} combined with one of
-	 *                     following values: {@link #RULE_EXACT_MATCH},
-	 *                     {@link #RULE_PREFIX_MATCH}, {@link #RULE_PATTERN_MATCH}
-	 *                     or {@link #RULE_CAMELCASE_MATCH}. e.g.
-	 *                     {@link #RULE_EXACT_MATCH} | {@link #RULE_CASE_SENSITIVE}
-	 *                     if an exact and case sensitive match is requested,
-	 *                     {@link #RULE_PREFIX_MATCH} if a prefix non case sensitive
-	 *                     match is requested or {@link #RULE_EXACT_MATCH} if a non
-	 *                     case sensitive and erasure match is requested.<br>
+	 *                     {@link #RULE_PREFIX_MATCH},
+	 *                     {@link #RULE_SUBSTRING_MATCH},
+	 *                     {@link #RULE_PATTERN_MATCH},
+	 *                     {@link #RULE_CAMELCASE_MATCH},
+	 *                     {@link #RULE_CASE_SENSITIVE}, or their combination in
+	 *                     order to enable more types of matching. Note that rules
+	 *                     {@link #RULE_CASE_SENSITIVE} and
+	 *                     {@link #RULE_SUBSTRING_MATCH} are special in that they
+	 *                     generally just affect how the other match rules
+	 *                     behave.<br>
+	 *                     Examples: {@link #RULE_EXACT_MATCH} |
+	 *                     {@link #RULE_CASE_SENSITIVE} if an exact and case
+	 *                     sensitive match is requested, {@link #RULE_PREFIX_MATCH}
+	 *                     if a prefix non case sensitive match is requested or
+	 *                     {@link #RULE_EXACT_MATCH} if a non case sensitive and
+	 *                     erasure match is requested.<br>
 	 *                     Note also that default behavior for generic types/methods
-	 *                     search is to find exact matches.
+	 *                     search is to find prefix matches.
 	 */
 	public SearchPattern(int allowedRules) {
 		this.allowedRules = allowedRules;
@@ -194,7 +196,7 @@ public class SearchPattern {
 	 * Gets the initial (input) string pattern.
 	 *
 	 * @return pattern
-	 * @since 3.126
+	 * @since 3.127
 	 */
 	public String getInitialPattern() {
 		return this.initialPattern;
@@ -616,15 +618,13 @@ public class SearchPattern {
 	}
 
 	/**
-	 * Returns the rule to apply for matching keys. Can be exact match, prefix
-	 * match, pattern match or camelcase match. Rule can also be combined with a
-	 * case sensitivity flag.
+	 * Returns the active rule to apply for matching keys, based on the currently
+	 * set {@link #setPattern(String) pattern} and allowed rules passed to the
+	 * {@link #SearchPattern(int) constructor}.
 	 *
-	 * @return one of RULE_EXACT_MATCH, RULE_PREFIX_MATCH, RULE_PATTERN_MATCH,
-	 *         RULE_CAMELCASE_MATCH, combined with RULE_CASE_SENSITIVE, e.g.
-	 *         RULE_EXACT_MATCH | RULE_CASE_SENSITIVE if an exact and case sensitive
-	 *         match is requested, or RULE_PREFIX_MATCH if a prefix non case
-	 *         sensitive match is requested.
+	 * @return one of {@link #RULE_BLANK_MATCH}, {@link #RULE_EXACT_MATCH},
+	 *         {@link #RULE_PREFIX_MATCH}, {@link #RULE_PATTERN_MATCH},
+	 *         {@link #RULE_CAMELCASE_MATCH}
 	 */
 	public final int getMatchRule() {
 		return this.matchRule;
@@ -632,7 +632,7 @@ public class SearchPattern {
 
 	/**
 	 * @return whether prefix matching is enforced
-	 * @since 3.126
+	 * @since 3.127
 	 */
 	public boolean isMatchPrefix() {
 		return matchPrefix;
@@ -640,7 +640,7 @@ public class SearchPattern {
 
 	/**
 	 * @return whether suffix matching is enforced
-	 * @since 3.126
+	 * @since 3.127
 	 */
 	public boolean isMatchSuffix() {
 		return matchSuffix;
