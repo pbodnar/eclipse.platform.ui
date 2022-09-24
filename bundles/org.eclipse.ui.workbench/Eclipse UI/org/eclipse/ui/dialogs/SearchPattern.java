@@ -252,8 +252,7 @@ public class SearchPattern {
 	}
 
 	private void initializePatternAndMatchRule(String pattern) {
-		int length = pattern.length();
-		if (length == 0) {
+		if (pattern.length() == 0) {
 			matchRule = RULE_BLANK_MATCH;
 			stringPattern = pattern;
 			return;
@@ -261,7 +260,7 @@ public class SearchPattern {
 
 		// pre-process the string pattern
 		char first = pattern.charAt(0);
-		char last = pattern.charAt(length - 1);
+		char last = pattern.charAt(pattern.length() - 1);
 		// note: a file name might start with a space => we can't use it for enforcing prefix match
 		matchPrefix = pattern.length() > 1 && first == START_SYMBOL;
 		matchSuffix = pattern.length() > (matchPrefix ? 2 : 1) && (last == END_SYMBOL || last == BLANK);
@@ -628,22 +627,6 @@ public class SearchPattern {
 	 */
 	public final int getMatchRule() {
 		return this.matchRule;
-	}
-
-	/**
-	 * @return whether prefix matching is enforced
-	 * @since 3.127
-	 */
-	public boolean isMatchPrefix() {
-		return matchPrefix;
-	}
-
-	/**
-	 * @return whether suffix matching is enforced
-	 * @since 3.127
-	 */
-	public boolean isMatchSuffix() {
-		return matchSuffix;
 	}
 
 	/**

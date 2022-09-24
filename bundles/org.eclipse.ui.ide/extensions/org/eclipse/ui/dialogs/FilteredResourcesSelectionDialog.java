@@ -102,6 +102,12 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 	private static final String SHOW_DERIVED = "ShowDerived"; //$NON-NLS-1$
 	private static final String FILTER_BY_LOCATION = "FilterByLocation"; //$NON-NLS-1$
 
+	private static final char START_SYMBOL = '>';
+
+	private static final char END_SYMBOL = '<';
+
+	private static final char BLANK = ' ';
+
 	// TODO Bug 531785: Present the new autoInfixSearch feature on
 	// the UI layer somehow. Make it optional via a constructor?
 	private final boolean autoInfixSearch = true;
@@ -1023,7 +1029,7 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 		private ResourceFilter(IContainer container, IContainer searchContainer, boolean showDerived, int typeMask) {
 			this(container, showDerived, typeMask);
 
-			String stringPattern = patternMatcher.getInitialPattern();
+			final String stringPattern = patternMatcher.getInitialPattern();
 			String filenamePattern;
 
 			int sep = stringPattern.lastIndexOf(IPath.SEPARATOR);
@@ -1038,7 +1044,7 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 					if (filenamePattern.isEmpty()) // relative patterns don't need a file name
 						filenamePattern = "**"; //$NON-NLS-1$
 
-					String containerPattern = stringPattern.substring(patternMatcher.isMatchPrefix() ? 1 : 0, sep);
+					String containerPattern = stringPattern.substring(isMatchPrefix(stringPattern) ? 1 : 0, sep);
 
 					if (searchContainer != null) {
 						relativeContainerPattern = new SearchPattern(
@@ -1059,7 +1065,7 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 							| SearchPattern.RULE_PREFIX_MATCH | SearchPattern.RULE_PATTERN_MATCH);
 					this.containerPattern.setPattern(containerPattern);
 				}
-				if (patternMatcher.isMatchPrefix()) {
+				if (isMatchPrefix(stringPattern)) {
 					filenamePattern = '>' + filenamePattern;
 				}
 				patternMatcher.setPattern(filenamePattern);
@@ -1074,7 +1080,7 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 				// `patternMatcher`).
 				namePattern = new SearchPattern(getDefaultMatchRules());
 				String namePatternStr = filenamePattern.substring(0, lastPatternDot);
-				if (patternMatcher.isMatchSuffix() && !namePatternStr.endsWith("*")) { //$NON-NLS-1$
+				if (isMatchSuffix(stringPattern) && !namePatternStr.endsWith("*")) { //$NON-NLS-1$
 					// This means extension part will end with '<' (or ' ')
 					// and we should apply the same for the name part.
 					namePatternStr += "<"; //$NON-NLS-1$
@@ -1259,6 +1265,31 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 			resourceFactory.saveState(element);
 		}
 
+	}
+
+	/**
+	 * Returns whether prefix matching is enforced in the given search pattern.
+	 */
+	private static boolean isMatchPrefix(String pattern) {
+		if (pattern.length() == 0) {
+			return false;
+		}
+
+		char first = pattern.charAt(0);
+		return pattern.length() > 1 && first == START_SYMBOL;
+	}
+
+	/**
+	 * Returns whether suffix matching is enforced in the given search pattern.
+	 */
+	private static boolean isMatchSuffix(String pattern) {
+		if (pattern.length() <= 1) {
+			return false;
+		}
+
+		char last = pattern.charAt(pattern.length() - 1);
+		boolean matchPrefix = isMatchPrefix(pattern);
+		return pattern.length() > (matchPrefix ? 2 : 1) && (last == END_SYMBOL || last == BLANK);
 	}
 
 }
