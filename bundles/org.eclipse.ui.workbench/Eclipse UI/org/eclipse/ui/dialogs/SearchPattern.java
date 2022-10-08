@@ -18,12 +18,9 @@ import org.eclipse.ui.internal.misc.TextMatcher;
 
 /**
  * A search pattern defines how search results are found.
- *
  * <p>
  * This class is intended to be subclassed by clients. A default behavior is
- * provided for each of the methods above, that clients can override if they
- * wish.
- * </p>
+ * provided that clients can override if they wish.
  *
  * @since 3.3
  */
@@ -39,8 +36,6 @@ public class SearchPattern {
 
 	/**
 	 * Match rule: The search pattern is a prefix of the search result.
-	 * <p>
-	 * This is the <em>default</em> match rule if no other applies.
 	 */
 	public static final int RULE_PREFIX_MATCH = 0x0001;
 
@@ -49,11 +44,11 @@ public class SearchPattern {
 	 * A '*' wild-card can replace 0 or more characters in the search result. A '?'
 	 * wild-card replaces exactly 1 character in the search result.
 	 * <p>
-	 * Unless the pattern ends with ' ' or '>', '*' is automatically added to the
-	 * end of the pattern.
+	 * Unless the pattern ends with ' ' or '>', search is performed as if '*' was
+	 * specified at the end of the pattern.
 	 * <p>
-	 * When {@link #RULE_SUBSTRING_MATCH} is in effect, then '*' is automatically
-	 * added to the start of the pattern.
+	 * When {@link #RULE_SUBSTRING_MATCH} is in effect, search is performed as if
+	 * '*' was specified at the start of the pattern.
 	 */
 	public static final int RULE_PATTERN_MATCH = 0x0002;
 
@@ -62,7 +57,6 @@ public class SearchPattern {
 	 * the same. Can be combined with previous rules, e.g. {@link #RULE_EXACT_MATCH}
 	 * | {@link #RULE_CASE_SENSITIVE}.
 	 */
-	// TODO The actual code seems to ignore this flag when performing searches.
 	public static final int RULE_CASE_SENSITIVE = 0x0008;
 
 	/**
@@ -146,10 +140,8 @@ public class SearchPattern {
 	private boolean matchSuffix;
 
 	/**
-	 * Creates a new instance of SearchPattern with the following match rules
-	 * configured: {@link #RULE_EXACT_MATCH} | {@link #RULE_PREFIX_MATCH} |
-	 * {@link #RULE_PATTERN_MATCH} | {@link #RULE_CAMELCASE_MATCH} |
-	 * {@link #RULE_BLANK_MATCH}.
+	 * Creates a new instance of SearchPattern with {@link #DEFAULT_MATCH_RULES
+	 * default set of rules} configured.
 	 */
 	public SearchPattern() {
 		this(DEFAULT_MATCH_RULES);
@@ -175,8 +167,6 @@ public class SearchPattern {
 	 *                     if a prefix non case sensitive match is requested or
 	 *                     {@link #RULE_EXACT_MATCH} if a non case sensitive and
 	 *                     erasure match is requested.<br>
-	 *                     Note also that default behavior for generic types/methods
-	 *                     search is to find prefix matches.
 	 */
 	public SearchPattern(int allowedRules) {
 		this.allowedRules = allowedRules;
@@ -216,10 +206,19 @@ public class SearchPattern {
 	}
 
 	/**
-	 * Matches text with pattern. matching is determine by matchKind.
+	 * Matches text with pattern. The way of matching is determined by the current
+	 * pattern setup - see {@link #getMatchRule()} for details.
+	 * <p>
+	 * If no rule applies or when {@link #RULE_CAMELCASE_MATCH} applies, but the
+	 * text doesn't match it, the default implementation of this method performs a
+	 * simple prefix, suffix, or substring matching (determined by the pattern
+	 * setup).
+	 * <p>
+	 * The default implementation generally does only case-insensitive searches,
+	 * i.e. {@link #RULE_CASE_SENSITIVE} is not considered here.
 	 *
 	 * @param text the text to match
-	 * @return true if search pattern was matched with text false in other way
+	 * @return true if search pattern was matched with text, false otherwise
 	 */
 	public boolean matches(String text) {
 		switch (matchRule) {
@@ -732,7 +731,6 @@ public class SearchPattern {
 	 * <i>WARNING: This method is <b>not</b> defined in reading order, i.e.
 	 * <code>a.isSubPattern(b)</code> is <code>true</code> iff <code>b</code> is a
 	 * sub-pattern of <code>a</code>, and not vice-versa. </i>
-	 * </p>
 	 *
 	 * @param pattern pattern to be checked
 	 * @return true if the given pattern is a sub pattern of this search pattern
