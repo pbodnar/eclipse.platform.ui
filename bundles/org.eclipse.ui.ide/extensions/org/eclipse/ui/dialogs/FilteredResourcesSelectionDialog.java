@@ -108,8 +108,7 @@ public class FilteredResourcesSelectionDialog extends FilteredItemsSelectionDial
 
 	private static final char BLANK = ' ';
 
-	// TODO Bug 531785: Present the new autoInfixSearch feature on
-	// the UI layer somehow. Make it optional via a constructor?
+	// this is hard-coded, as a UI option is most probably not necessary
 	private final boolean autoInfixSearch = true;
 
 	private int getDefaultMatchRules() {
