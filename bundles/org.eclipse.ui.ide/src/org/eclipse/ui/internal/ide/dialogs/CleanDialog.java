@@ -103,7 +103,8 @@ public class CleanDialog extends MessageDialog {
 	private IWorkbenchWindow window;
 
 	private Text filterText;
-	private SearchPattern searchPattern = new SearchPattern();
+	private SearchPattern searchPattern = new SearchPattern(
+			SearchPattern.DEFAULT_MATCH_RULES | SearchPattern.RULE_SUBSTRING_MATCH);
 
 	/**
 	 * Gets the text of the clean dialog, depending on whether the
@@ -220,11 +221,7 @@ public class CleanDialog extends MessageDialog {
 		filterText.setLayoutData(gd);
 		filterText.addModifyListener(e -> {
 			String filter = filterText.getText();
-			if (filter.startsWith("*") || filter.startsWith("?")) { //$NON-NLS-1$ //$NON-NLS-2$
-				searchPattern.setPattern(filter);
-			} else {
-				searchPattern.setPattern("*" + filter); //$NON-NLS-1$
-			}
+			searchPattern.setPattern(filter);
 
 			if (filter.isEmpty()) {
 				filterText.setMessage(IDEWorkbenchMessages.CleanDialog_typeFilterText);
